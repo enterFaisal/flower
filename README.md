@@ -23,6 +23,12 @@ npm run build
 pm2 reload mewa-gamification
 ```
 
+# stop the app
+
+```bash
+pm2 stop mewa-gamification
+```
+
 ## Quick Commands
 
 ```bash
@@ -49,3 +55,8 @@ PORT=80
 ```
 
 **Note:** Port 80 requires root/admin privileges. If it fails, use port 3000 and set up Nginx reverse proxy.
+
+2 main urls:
+
+- https://mewa-event.uselines.com (for users)
+- https://mewa-event.uselines.com/live-display (for live display)

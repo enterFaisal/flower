@@ -7,10 +7,10 @@ import pattern2 from "../brand/Pattern (2).png";
 // Flower name to color mapping
 const flowerColors = {
   الورف: "#F5DEB3", // White lily - wheat/cream (for visibility on white background)
-  "الورد الطائفي": "#E91E63", // Pink rose - pink/magenta
+  الورد_الطائفي: "#E91E63", // Pink rose - pink/magenta
   الدفلى: "#FF69B4", // Pink flower - hot pink
   الخزامى: "#9370DB", // Lavender - purple
-  "الاقحوان البري": "#FFD700", // Daisy - yellow/gold
+  الاقحوان_البري: "#FFD700", // Daisy - yellow/gold
 };
 
 // Seeded random number generator for consistent positions
@@ -470,7 +470,7 @@ function FlowerItem({ user, x, y, size, zIndex, overlapping }) {
       >
         <div className="relative w-full h-3/4 mx-auto">
           <Image
-            src={user.flower.flowerImage || "/flowers/الاقحوان البري2.png"}
+            src={user.flower.flowerImage || "/flowers/الاقحوان_البري2.png"}
             alt={user.flower.seedName}
             fill
             style={{ objectFit: "contain" }}
