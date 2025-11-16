@@ -1,0 +1,239 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Tajawal:wght@300;400;500;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    direction: rtl;
+    font-family: 'Cairo', 'Tajawal', sans-serif;
+  }
+
+  body {
+    @apply bg-gradient-to-br from-gray-50 to-green-50 min-h-screen;
+  }
+
+  * {
+    @apply antialiased;
+  }
+}
+
+@layer components {
+  /* Wave pattern background */
+  .wave-pattern {
+    background-image: 
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 35px,
+        rgba(17, 122, 101, 0.03) 35px,
+        rgba(17, 122, 101, 0.03) 70px
+      );
+  }
+
+  .wave-svg {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 150px;
+    opacity: 0.1;
+  }
+
+  /* Button styles */
+  .btn-primary {
+    @apply bg-mewa-green-600 hover:bg-mewa-green-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 text-mewa-green-700 font-bold py-3 px-6 rounded-lg border-2 border-mewa-green-600 transition-all duration-300 transform hover:scale-105 active:scale-95;
+  }
+
+  .btn-option {
+    @apply w-full text-right bg-white hover:bg-mewa-green-50 border-2 border-gray-200 hover:border-mewa-green-500 text-gray-800 py-4 px-6 rounded-lg transition-all duration-200 cursor-pointer;
+  }
+
+  .btn-option:hover {
+    @apply shadow-md;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-white rounded-lg sm:rounded-xl shadow-lg p-4 sm:p-5 md:p-6 transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply hover:shadow-2xl hover:-translate-y-1;
+  }
+
+  /* Input styles */
+  .input-field {
+    @apply w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-mewa-green-500 transition-colors duration-200 text-right;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply h-2 bg-gray-200 rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full bg-gradient-to-l from-mewa-green-500 to-mewa-green-600 transition-all duration-500;
+  }
+
+  /* Checkmark animation */
+  .checkmark {
+    @apply inline-block w-6 h-6 rounded-full bg-green-500 text-white;
+    animation: checkmark-pop 0.3s ease-out;
+  }
+
+  @keyframes checkmark-pop {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+
+  /* Flower container for live display */
+  .flower-grid {
+    @apply grid gap-4 p-4;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  .flower-item {
+    @apply flex flex-col items-center justify-center p-4 bg-white rounded-lg shadow-md;
+    animation: popIn 0.5s ease-out;
+  }
+
+  /* RTL-specific utilities */
+  .text-gradient {
+    @apply bg-gradient-to-l from-mewa-green-600 to-mewa-green-800 bg-clip-text text-transparent;
+  }
+}
+
+@layer utilities {
+  .rtl-flip {
+    transform: scaleX(-1);
+  }
+
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+}
+
+/* Custom scrollbar for RTL */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #117A65;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0F6A58;
+}
+
+/* --- Growth Animation - 3 Phases --- */
+/* Phase 1: Seeds (0-2s) */
+@keyframes flower-phase-1 {
+  0% { opacity: 0; transform: translateY(20px) scale(0.8); }
+  5% { opacity: 1; transform: translateY(0) scale(1); }
+  30% { opacity: 1; transform: translateY(0) scale(1); }
+  35% { opacity: 0; transform: translateY(-10px) scale(0.9); }
+  100% { opacity: 0; }
+}
+
+/* Phase 2: First Growth Stage (2-4s) */
+@keyframes flower-phase-2 {
+  0%, 30% { opacity: 0; transform: translateY(20px) scale(0.8); }
+  35% { opacity: 1; transform: translateY(0) scale(1); }
+  60% { opacity: 1; transform: translateY(0) scale(1); }
+  65% { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  100% { opacity: 0; }
+}
+
+/* Phase 3: Fully Grown Flower (4-6s) */
+@keyframes flower-phase-3 {
+  0%, 60% { opacity: 0; transform: translateY(20px) scale(0.8); }
+  65% { opacity: 1; transform: translateY(0) scale(1.05); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* --- Helper Icons Animations (ALL NEW) --- */
+
+/* 1. Watering Animation (3 parts for perfect sync) */
+@keyframes watering-container-move {
+  0%, 100% { opacity: 0; transform: translate(100px, -50px); }
+  20% { opacity: 1; transform: translate(0, 0); } /* Arrives */
+  55% { opacity: 1; transform: translate(0, 0); } /* Stays */
+  65%, 100% { opacity: 0; transform: translate(-100px, 50px); } /* Leaves */
+}
+
+@keyframes watering-can-tilt {
+  0%, 25%, 55%, 100% { transform: rotate(0deg); }
+  45% { transform: rotate(-35deg); } /* Tilt to pour */
+}
+
+@keyframes water-drops-fall {
+  0%, 30% { opacity: 0; transform: translateY(-20px); }
+  35% { opacity: 0.9; transform: translateY(0); } /* Appear at spout */
+  50% { opacity: 0; transform: translateY(80px); } /* Fall and fade */
+  100% { opacity: 0; }
+}
+
+/* 2. Sun Animation (Shine and fade) */
+@keyframes helper-sun-shine {
+  0%, 40%, 100% { opacity: 0; transform: scale(0.5) rotate(-45deg); }
+  50% { opacity: 1; transform: scale(1) rotate(0deg); }
+  60% { opacity: 1; transform: scale(1.2) rotate(15deg); filter: brightness(1.2); }
+  75% { opacity: 1; transform: scale(1) rotate(0deg); filter: brightness(1); }
+  85%, 100% { opacity: 0; transform: scale(0.8) rotate(45deg); }
+}
+
+/* 3. Care/Love Animation (Gentle pop) */
+@keyframes helper-care-pop {
+  0%, 65%, 100% { opacity: 0; transform: scale(0.5); }
+  75% { opacity: 1; transform: scale(1.1); }
+  85% { opacity: 1; transform: scale(1); }
+  95%, 100% { opacity: 0; transform: scale(0.8); }
+}
+
+
+/* --- Apply animations to classes --- */
+/* The z-index is fixed so the final flower is on top */
+.animate-flower-phase-1 { animation: flower-phase-1 6s ease-in-out forwards; z-index: 1; }
+.animate-flower-phase-2 { animation: flower-phase-2 6s ease-in-out forwards; z-index: 2; }
+.animate-flower-phase-3 { animation: flower-phase-3 6s ease-in-out forwards; z-index: 3; }
+
+/* Watering animations */
+.animate-watering-container { animation: watering-container-move 6s ease-in-out forwards; }
+.animate-watering-can { animation: watering-can-tilt 6s ease-in-out forwards; transform-origin: bottom right; }
+.animate-water-drops { animation: water-drops-fall 6s ease-in-out forwards; }
+
+/* Helper icon animations */
+.animate-helper-sun { animation: helper-sun-shine 6s ease-in-out forwards; }
+.animate-helper-care { animation: helper-care-pop 6s ease-in-out forwards; }
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
+}
+
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
