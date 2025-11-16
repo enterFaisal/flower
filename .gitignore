@@ -33,5 +33,5 @@ yarn-error.log*
 next-env.d.ts
 
 # user data
-# /data
+/data
 
