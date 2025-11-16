@@ -73,3 +73,41 @@ PORT=80
 ## Data Download
 
 - `https://mewa-event.uselines.com/api/download-users` (to download users data as JSON)
+
+## Automatic Backups
+
+The system automatically creates backups of `users.json` whenever it's modified. Backups are saved two directories up from the `data/` folder.
+
+### Backup Location
+
+If your project structure is:
+
+```
+project/
+  code/
+    data/
+      users.json
+```
+
+Backups are created at:
+
+```
+project/
+  users-2024-01-15T10-30-45.json  (timestamped backup)
+  users.json.backup                (latest backup, always overwritten)
+```
+
+### Backup Files
+
+- **Timestamped backups**: `users-YYYY-MM-DDTHH-MM-SS.json` - Historical backups with timestamps
+- **Latest backup**: `users.json.backup` - Always contains the most recent version
+
+### When Backups Are Created
+
+Backups are automatically created when:
+
+- A new user registers (`/api/register`)
+- User progress is updated (`/api/users/update-progress`)
+- Flower data is saved via socket (`/api/socket`)
+
+**Note:** Backup failures are logged but won't interrupt the main operation.
