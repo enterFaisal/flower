@@ -7,6 +7,34 @@ import logo from "../brand/logo.png";
 import pattern1 from "../brand/Pattern(1).png";
 import { preloadRouteImages } from "../lib/imagePreloader";
 
+const CategoryIcon = ({ icon, emoji, alt, size = 48 }) => {
+  if (icon) {
+    return (
+      <div
+        className="relative flex items-center justify-center"
+        style={{ width: size, height: size }}
+      >
+        <Image
+          src={icon}
+          alt={alt}
+          fill
+          sizes={`${size}px`}
+          className="object-contain"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <span
+      className="flex items-center justify-center"
+      style={{ fontSize: size * 0.6 }}
+    >
+      {emoji}
+    </span>
+  );
+};
+
 export default function CommitmentQuiz() {
   const router = useRouter();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -153,7 +181,7 @@ export default function CommitmentQuiz() {
                 priority
               />
               <h1 className="text-3xl md:text-4xl font-bold text-mewa-green-700">
-                نسبة الالتزام بالقيم 📊
+                نسبة الالتزام بالقيم 🌧️
               </h1>
             </div>
           </div>
@@ -169,7 +197,12 @@ export default function CommitmentQuiz() {
                     {commitmentQuizData.questions.length}
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl">{currentQuestion.emoji}</span>
+                    <CategoryIcon
+                      icon={currentQuestion.icon}
+                      emoji={currentQuestion.emoji}
+                      alt={`أيقونة ${currentQuestion.category}`}
+                      size={40}
+                    />
                     <span className="text-sm font-bold text-mewa-green-700">
                       {currentQuestion.category}
                     </span>
@@ -204,7 +237,12 @@ export default function CommitmentQuiz() {
               <div className="card">
                 <div className="mb-6">
                   <div className="flex items-center gap-3 mb-4">
-                    <span className="text-4xl">{currentQuestion.emoji}</span>
+                    <CategoryIcon
+                      icon={currentQuestion.icon}
+                      emoji={currentQuestion.emoji}
+                      alt={`أيقونة ${currentQuestion.category}`}
+                      size={72}
+                    />
                     <div>
                       <span className="inline-block bg-mewa-green-100 text-mewa-green-700 px-4 py-2 rounded-full text-sm font-bold">
                         {currentQuestion.category}
@@ -271,7 +309,14 @@ export default function CommitmentQuiz() {
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     {commitmentQuizData.questions.map((q) => (
                       <div key={q.id} className="text-center">
-                        <div className="text-3xl mb-2">{q.emoji}</div>
+                        <div className="flex justify-center mb-2">
+                          <CategoryIcon
+                            icon={q.icon}
+                            emoji={q.emoji}
+                            alt={`أيقونة ${q.category}`}
+                            size={56}
+                          />
+                        </div>
                         <div className="text-sm font-bold text-gray-700">
                           {q.category}
                         </div>

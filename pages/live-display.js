@@ -375,7 +375,7 @@ export default function LiveDisplay() {
                     حديقة المشاركين 🌸
                   </h2>
                   <p className="text-base text-gray-600">
-                    {flowers.length} مشارك أكمل النشاط الأول
+                    {flowers.length} مشاركين اكملوا النشاط الاول
                   </p>
                 </div>
                 {/* The flowers are mapped with calculated positions */}

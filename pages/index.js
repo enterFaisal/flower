@@ -127,7 +127,7 @@ export default function Home() {
                     مبروك! أكملت جميع الأنشطة
                   </h3>
                   <p className="text-base sm:text-lg md:text-xl text-gray-700 leading-relaxed px-2">
-                    تم إدخالك تلقائياً في السحب على الجوائز القيمة
+                    تم إدخالك تلقائياً في السحب على قسائم شرائية من رسال
                   </p>
                   <div className="mt-4 sm:mt-6 text-4xl sm:text-5xl md:text-6xl">
                     🎁
@@ -140,7 +140,7 @@ export default function Home() {
           {/* Games Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-7xl mx-auto">
             <GameCard
-              title="لعبة الوَرْد"
+              title="بكم نزهر"
               description="ازرع وردتك واكتشف كيف تساهم قيمك في نمو الوزارة"
               href="/flower-game"
               isCompleted={gameProgress.flowerGame}
@@ -164,7 +164,7 @@ export default function Home() {
               description="قيّم التزامك بالقيم الخمس واكتشف مجالات التطوير"
               href="/commitment-quiz"
               isCompleted={gameProgress.commitmentQuiz}
-              icon="📊"
+              icon="🌧️"
               isLocked={!gameProgress.personalityQuiz}
               stepNumber={3}
             />

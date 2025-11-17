@@ -32,7 +32,7 @@ export default function PersonalityQuiz() {
       try {
         const progress = JSON.parse(savedProgress);
         if (!progress.flowerGame) {
-          alert("يجب إكمال لعبة الوَرْد أولاً!");
+          alert("يجب إكمال بكم نزهر أولاً!");
           router.replace("/");
           return;
         }

@@ -291,7 +291,7 @@ export default function FlowerGame() {
   return (
     <>
       <Head>
-        <title>لعبة الوَرْد - وزارة البيئة والمياه والزراعة</title>
+        <title>بكم نزهر - وزارة البيئة والمياه والزراعة</title>
       </Head>
 
       <div className="min-h-screen py-8 relative">
@@ -322,7 +322,7 @@ export default function FlowerGame() {
                 className="hidden md:block"
               />
               <h1 className="text-3xl md:text-4xl font-bold text-mewa-green-700">
-                لعبة الوَرْد 🌸
+                بكم نزهر 🌸
               </h1>
             </div>
           </div>
