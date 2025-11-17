@@ -105,7 +105,7 @@ export default function Home() {
               مرحباً {userData?.name || ""}!
             </h2>
             <p className="text-base sm:text-lg text-gray-700 max-w-3xl mx-auto leading-relaxed px-3 sm:px-4 mb-4">
-              أكمل الأنشطة الثلاثة بالترتيب لاكتشاف قيمك المؤسسية والدخول في
+              أكمل الأنشطة الثلاثة بالترتيب لاكتشاف ثقافتك التنظيمة والدخول في
               السحب على جوائز قيمة
             </p>
             <div className="mt-3 sm:mt-4 mx-2 sm:mx-auto inline-block bg-mewa-yellow-50 border-2 border-mewa-yellow-500 rounded-lg px-4 sm:px-6 py-2 sm:py-3 max-w-full">
