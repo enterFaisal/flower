@@ -31,11 +31,28 @@ function updateUserWithFlower(flowerData) {
     }
 
     if (userIndex !== -1) {
+      // Initialize flower object if it doesn't exist
+      if (!users[userIndex].flower) {
+        users[userIndex].flower = {};
+      }
+      
+      // Update flower properties, preserving existing data
       users[userIndex].flower = {
+        ...users[userIndex].flower,
         seedName: flowerData.seedName,
         flowerImage: flowerData.flowerImage,
-        level: flowerData.level,
       };
+      
+      // Update level using Math.max to prevent downgrading
+      // This ensures level only increases, never decreases
+      if (typeof flowerData.level === "number") {
+        const currentLevel =
+          typeof users[userIndex].flower.level === "number"
+            ? users[userIndex].flower.level
+            : 0;
+        users[userIndex].flower.level = Math.max(currentLevel, flowerData.level);
+      }
+      
       if (flowerData.userName) {
         users[userIndex].name = flowerData.userName;
       }

@@ -382,6 +382,79 @@ export default function FlowerGame() {
                 });
               }
 
+              // Also update via API as backup (more reliable on mobile)
+              // This ensures level is updated even if socket fails
+              const persistLevel = async () => {
+                // Get user data from state or localStorage as fallback
+                let currentUserId = userId;
+                let currentUserPhone = userPhone;
+
+                if (!currentUserId && !currentUserPhone) {
+                  try {
+                    const savedUserData = localStorage.getItem("userData");
+                    if (savedUserData) {
+                      const userData = JSON.parse(savedUserData);
+                      currentUserId = userData.id || "";
+                      currentUserPhone = userData.phone || "";
+                    }
+                  } catch (e) {
+                    console.error(
+                      "Error getting user data from localStorage:",
+                      e
+                    );
+                  }
+                }
+
+                if (!currentUserId && !currentUserPhone) {
+                  console.warn(
+                    "Cannot persist level: no user ID or phone found"
+                  );
+                  return;
+                }
+
+                try {
+                  const payload = {
+                    ...(currentUserId ? { userId: currentUserId } : {}),
+                    ...(currentUserPhone ? { phone: currentUserPhone } : {}),
+                    level: 1,
+                    flower: {
+                      seedName: selectedPlant.seedName,
+                      flowerImage: selectedPlant.flowerImage,
+                    },
+                  };
+
+                  console.log("Persisting level 1 for flower game, user:", {
+                    userId: currentUserId,
+                    phone: currentUserPhone,
+                  });
+
+                  const response = await fetch("/api/users/update-progress", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                  });
+
+                  if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(
+                      `API returned ${response.status}: ${
+                        errorData.error || "Unknown error"
+                      }`
+                    );
+                  }
+
+                  const result = await response.json();
+                  console.log("Level 1 persisted successfully:", result);
+                } catch (error) {
+                  console.error("Failed to persist level via API:", error);
+                  // Don't block user experience if API call fails
+                }
+              };
+
+              persistLevel();
+
               // Update localStorage
               const savedProgress = localStorage.getItem("gameProgress");
               const progress = savedProgress ? JSON.parse(savedProgress) : {};

@@ -207,29 +207,63 @@ export default function CommitmentQuiz() {
   }, [router]);
 
   const persistLevel = async (level, commitmentPercentageValue) => {
-    if (!userIdentifiers.id && !userIdentifiers.phone) {
+    // Get user data directly from localStorage as fallback
+    // This ensures we have the data even if state hasn't updated
+    let userId = userIdentifiers.id;
+    let phone = userIdentifiers.phone;
+
+    if (!userId && !phone) {
+      try {
+        const savedUserData = localStorage.getItem("userData");
+        if (savedUserData) {
+          const userData = JSON.parse(savedUserData);
+          userId = userData.id || "";
+          phone = userData.phone || "";
+        }
+      } catch (e) {
+        console.error("Error getting user data from localStorage:", e);
+      }
+    }
+
+    if (!userId && !phone) {
+      console.warn("Cannot persist level: no user ID or phone found");
       return;
     }
 
     try {
       const payload = {
-        ...(userIdentifiers.id ? { userId: userIdentifiers.id } : {}),
-        ...(userIdentifiers.phone ? { phone: userIdentifiers.phone } : {}),
+        ...(userId ? { userId } : {}),
+        ...(phone ? { phone } : {}),
         level,
         ...(typeof commitmentPercentageValue === "number"
           ? { commitmentPercentage: commitmentPercentageValue }
           : {}),
       };
 
-      await fetch("/api/users/update-progress", {
+      console.log("Persisting level:", level, "for user:", { userId, phone });
+
+      const response = await fetch("/api/users/update-progress", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `API returned ${response.status}: ${
+            errorData.error || "Unknown error"
+          }`
+        );
+      }
+
+      const result = await response.json();
+      console.log("Level persisted successfully:", result);
     } catch (error) {
       console.error("Failed to persist level:", error);
+      // Don't throw - allow user to continue even if API call fails
     }
   };
 

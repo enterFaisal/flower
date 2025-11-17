@@ -65,20 +65,42 @@ export default async function handler(req, res) {
 
     const user = users[userIndex];
 
-    if (typeof level === "number") {
-      if (!user.flower) {
-        user.flower = {};
-      }
-      const currentLevel =
-        typeof user.flower.level === "number" ? user.flower.level : 0;
-      user.flower.level = Math.max(currentLevel, level);
+    // Initialize flower object if it doesn't exist
+    if (!user.flower) {
+      user.flower = {};
     }
 
+    // Log current state
+    const currentLevelBefore =
+      typeof user.flower.level === "number" ? user.flower.level : 0;
+    console.log(
+      `[Update Progress] User: ${user.name || user.phone}, Current level: ${currentLevelBefore}, New level: ${level}`
+    );
+
+    // Update level first using Math.max to ensure it only increases
+    if (typeof level === "number") {
+      const currentLevel =
+        typeof user.flower.level === "number" ? user.flower.level : 0;
+      const newLevel = Math.max(currentLevel, level);
+      user.flower.level = newLevel;
+      console.log(
+        `[Update Progress] Level updated from ${currentLevel} to ${newLevel}`
+      );
+    }
+
+    // Update flower properties, but preserve the level that was just set
+    // This prevents the flower object from overwriting a higher level
     if (flower && typeof flower === "object") {
+      const preservedLevel = user.flower.level; // Save current level
       user.flower = {
-        ...(user.flower || {}),
+        ...user.flower,
         ...flower,
       };
+      // Restore level if it was decreased by the spread
+      if (typeof preservedLevel === "number") {
+        const newLevel = user.flower.level || 0;
+        user.flower.level = Math.max(preservedLevel, newLevel);
+      }
     }
 
     if (typeof commitmentPercentage === "number") {
