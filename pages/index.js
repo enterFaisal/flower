@@ -14,6 +14,7 @@ export default function Home() {
     commitmentQuiz: false,
   });
   const [userData, setUserData] = useState(null);
+  const [commitmentDroplet, setCommitmentDroplet] = useState(null);
 
   useEffect(() => {
     // Preload images for potential next routes
@@ -45,6 +46,18 @@ export default function Home() {
       } catch (e) {
         console.error("Error parsing game progress:", e);
       }
+    }
+
+    const savedDroplet = localStorage.getItem("commitmentDroplet");
+    if (savedDroplet) {
+      try {
+        setCommitmentDroplet(JSON.parse(savedDroplet));
+      } catch (e) {
+        console.error("Error parsing commitment droplet:", e);
+        setCommitmentDroplet(null);
+      }
+    } else {
+      setCommitmentDroplet(null);
     }
   }, [router]);
 
@@ -169,6 +182,39 @@ export default function Home() {
               stepNumber={3}
             />
           </div>
+
+          {gameProgress.commitmentQuiz && commitmentDroplet && (
+            <div className="max-w-2xl mx-auto mt-6 sm:mt-8 md:mt-12 px-2 animate-fade-in">
+              <div className="bg-white rounded-2xl shadow-xl border-2 border-blue-100 p-5 sm:p-6 flex flex-col sm:flex-row items-center gap-5">
+                <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0">
+                  <Image
+                    src={commitmentDroplet.image}
+                    alt={commitmentDroplet.alt || "قطرة الالتزام"}
+                    fill
+                    sizes="112px"
+                    className="object-contain drop-shadow-lg"
+                  />
+                </div>
+                <div className="text-center sm:text-right">
+                  <p className="text-sm font-bold text-mewa-green-600 mb-1">
+                    لون قطرة التزامك
+                  </p>
+                  <h3
+                    className="text-xl sm:text-2xl font-bold mb-2"
+                    style={{ color: commitmentDroplet.colorHex }}
+                  >
+                    {commitmentDroplet.colorName}
+                  </h3>
+                  <p className="text-gray-700 text-sm sm:text-base">
+                    نسبة الالتزام التي حققتها:{" "}
+                    <span className="font-bold text-mewa-green-700">
+                      {commitmentDroplet.percentage}%
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Progress Indicator */}
           <div className="max-w-2xl mx-auto mt-6 sm:mt-8 md:mt-12 px-2">

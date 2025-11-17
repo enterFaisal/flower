@@ -30,7 +30,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId, phone, level, flower } = req.body || {};
+    const {
+      userId,
+      phone,
+      level,
+      flower,
+      commitmentPercentage,
+    } = req.body || {};
 
     if (!userId && !phone) {
       return res.status(400).json({ error: "userId or phone is required" });
@@ -73,6 +79,10 @@ export default async function handler(req, res) {
         ...(user.flower || {}),
         ...flower,
       };
+    }
+
+    if (typeof commitmentPercentage === "number") {
+      user.commitmentPercentage = commitmentPercentage;
     }
 
     user.updatedAt = new Date().toISOString();

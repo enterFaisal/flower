@@ -35,6 +35,54 @@ const CategoryIcon = ({ icon, emoji, alt, size = 48 }) => {
   );
 };
 
+const dropletMilestones = [
+  {
+    min: 10,
+    max: 20,
+    instruction: "علّق القطرة الصفراء في الغيمة",
+    image: "/water/yallow.png",
+    alt: "القطرة الصفراء",
+    colorName: "القطرة الصفراء",
+    colorHex: "#F2D64B",
+  },
+  {
+    min: 30,
+    max: 40,
+    instruction: "علّق القطرة الخضراء الغامقة في الغيمة",
+    image: "/water/darkgreen.png",
+    alt: "القطرة الخضراء الغامقة",
+    colorName: "القطرة الخضراء الغامقة",
+    colorHex: "#1E8144",
+  },
+  {
+    min: 50,
+    max: 60,
+    instruction: "علّق القطرة الخضراء الفاتحة في الغيمة",
+    image: "/water/green.png",
+    alt: "القطرة الخضراء الفاتحة",
+    colorName: "القطرة الخضراء الفاتحة",
+    colorHex: "#69B868",
+  },
+  {
+    min: 70,
+    max: 80,
+    instruction: "علّق القطرة الزرقاء الغامقة في الغيمة",
+    image: "/water/darkblue.png",
+    alt: "القطرة الزرقاء الغامقة",
+    colorName: "القطرة الزرقاء الغامقة",
+    colorHex: "#1A4B8B",
+  },
+  {
+    min: 90,
+    max: 100,
+    instruction: "علّق القطرة السماوية في الغيمة",
+    image: "/water/blue.png",
+    alt: "القطرة السماوية",
+    colorName: "القطرة السماوية",
+    colorHex: "#5BC0F8",
+  },
+];
+
 export default function CommitmentQuiz() {
   const router = useRouter();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -92,7 +140,7 @@ export default function CommitmentQuiz() {
     }
   }, [router]);
 
-  const persistLevel = async (level) => {
+  const persistLevel = async (level, commitmentPercentageValue) => {
     if (!userIdentifiers.id && !userIdentifiers.phone) {
       return;
     }
@@ -102,6 +150,9 @@ export default function CommitmentQuiz() {
         ...(userIdentifiers.id ? { userId: userIdentifiers.id } : {}),
         ...(userIdentifiers.phone ? { phone: userIdentifiers.phone } : {}),
         level,
+        ...(typeof commitmentPercentageValue === "number"
+          ? { commitmentPercentage: commitmentPercentageValue }
+          : {}),
       };
 
       await fetch("/api/users/update-progress", {
@@ -118,6 +169,12 @@ export default function CommitmentQuiz() {
 
   const currentQuestion = commitmentQuizData.questions[currentQuestionIndex];
   const maxScore = commitmentQuizData.questions.length * 3;
+  const commitmentPercentage = Math.round((totalScore / maxScore) * 100);
+  const dropletInstruction = dropletMilestones.find(
+    (milestone) =>
+      commitmentPercentage >= milestone.min &&
+      commitmentPercentage <= milestone.max
+  );
 
   const handleAnswerClick = (answer) => {
     const newScore = totalScore + answer.points;
@@ -133,6 +190,26 @@ export default function CommitmentQuiz() {
       );
       setResult(finalResult);
       setShowResult(true);
+      const finalPercentage = Math.round((newScore / maxScore) * 100);
+      const finalDropletInstruction = dropletMilestones.find(
+        (milestone) =>
+          finalPercentage >= milestone.min && finalPercentage <= milestone.max
+      );
+
+      if (finalDropletInstruction) {
+        localStorage.setItem(
+          "commitmentDroplet",
+          JSON.stringify({
+            colorName: finalDropletInstruction.colorName,
+            colorHex: finalDropletInstruction.colorHex,
+            image: finalDropletInstruction.image,
+            alt: finalDropletInstruction.alt,
+            percentage: finalPercentage,
+          })
+        );
+      } else {
+        localStorage.removeItem("commitmentDroplet");
+      }
 
       // Update localStorage
       const savedProgress = localStorage.getItem("gameProgress");
@@ -140,7 +217,7 @@ export default function CommitmentQuiz() {
       progress.commitmentQuiz = true;
       localStorage.setItem("gameProgress", JSON.stringify(progress));
 
-      persistLevel(3);
+      persistLevel(3, finalPercentage);
     }
   };
 
@@ -278,8 +355,22 @@ export default function CommitmentQuiz() {
           {showResult && result && (
             <div className="max-w-2xl mx-auto animate-pop-in">
               <div className="card text-center">
-                {/* Result Emoji */}
-                <div className="text-8xl mb-6">{result.emoji}</div>
+                {/* Result Droplet */}
+                <div className="flex justify-center mb-6">
+                  {dropletInstruction ? (
+                    <div className="relative w-40 h-40">
+                      <Image
+                        src={dropletInstruction.image}
+                        alt={dropletInstruction.alt}
+                        fill
+                        sizes="160px"
+                        className="object-contain drop-shadow-lg"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-8xl">{result.emoji}</div>
+                  )}
+                </div>
 
                 {/* Score Display */}
                 <div className="mb-6">
@@ -334,15 +425,43 @@ export default function CommitmentQuiz() {
                     <div
                       className="h-full bg-gradient-to-l from-mewa-green-500 to-mewa-green-600 transition-all duration-1000 flex items-center justify-end px-3"
                       style={{
-                        width: `${(totalScore / maxScore) * 100}%`,
+                        width: `${commitmentPercentage}%`,
                       }}
                     >
                       <span className="text-white font-bold text-sm">
-                        {Math.round((totalScore / maxScore) * 100)}%
+                        {commitmentPercentage}%
                       </span>
                     </div>
                   </div>
                 </div>
+
+                {dropletInstruction && (
+                  <div className="bg-white border-2 border-mewa-green-100 rounded-2xl p-6 mb-6 text-center flex flex-col items-center gap-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-mewa-green-700 mb-1">
+                        توجّه إلى الغيمة وعلّق قطرتك
+                      </h3>
+                      <p className="text-gray-700 leading-relaxed">
+                        {dropletInstruction.instruction}
+                      </p>
+                    </div>
+                    <div className="relative w-36 h-36">
+                      <Image
+                        src={dropletInstruction.image}
+                        alt={dropletInstruction.alt}
+                        fill
+                        sizes="144px"
+                        className="object-contain drop-shadow-lg"
+                      />
+                    </div>
+                    <div className="text-sm font-bold text-mewa-green-800">
+                      لون قطرتك: {dropletInstruction.colorName}
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      نسبة الالتزام الحالية: {commitmentPercentage}%
+                    </p>
+                  </div>
+                )}
 
                 {/* Encouragement Message */}
                 <div className="bg-gradient-to-l from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-6 mb-6">
