@@ -68,6 +68,8 @@ export default function Register() {
         registeredAt: data.user.registeredAt,
       };
       localStorage.setItem("userData", JSON.stringify(userData));
+      // Also save user ID separately for easy access
+      localStorage.setItem("userId", data.user.id || data.user.phone);
 
       // Reset game progress for new user
       const gameProgress = {

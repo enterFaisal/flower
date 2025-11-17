@@ -101,8 +101,9 @@ export default function FlowerGame() {
       return;
     }
 
+    let userData;
     try {
-      const userData = JSON.parse(savedUserData);
+      userData = JSON.parse(savedUserData);
       setUserName(userData.name);
       setUserPhone(userData.phone);
       setUserId(userData.id || "");
@@ -112,19 +113,56 @@ export default function FlowerGame() {
       return;
     }
 
-    const savedProgress = localStorage.getItem("gameProgress");
-    if (savedProgress) {
+    // Check if user ID exists in users.json
+    const checkUserAndProgress = async () => {
+      const userId = userData.id || localStorage.getItem("userId");
+      if (!userId) {
+        // No user ID, allow them to play (new user)
+        return;
+      }
+
       try {
-        const progress = JSON.parse(savedProgress);
-        if (progress.flowerGame) {
-          alert("لقد أكملت هذا النشاط مسبقًا.");
-          router.replace("/");
+        const response = await fetch("/api/users/check-id", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userId }),
+        });
+
+        const data = await response.json();
+        
+        if (!data.exists) {
+          // User ID not in users.json, clear localStorage and redirect to register
+          localStorage.removeItem("userData");
+          localStorage.removeItem("userId");
+          localStorage.removeItem("gameProgress");
+          localStorage.removeItem("commitmentDroplet");
+          router.push("/register");
           return;
         }
-      } catch (e) {
-        console.error("Error parsing game progress:", e);
+      } catch (error) {
+        console.error("Error checking user ID:", error);
+        // On error, continue with existing check
       }
-    }
+
+      // If user exists in users.json, check if they already completed
+      const savedProgress = localStorage.getItem("gameProgress");
+      if (savedProgress) {
+        try {
+          const progress = JSON.parse(savedProgress);
+          if (progress.flowerGame) {
+            alert("لقد أكملت هذا النشاط مسبقًا.");
+            router.replace("/");
+            return;
+          }
+        } catch (e) {
+          console.error("Error parsing game progress:", e);
+        }
+      }
+    };
+
+    checkUserAndProgress();
   }, []);
 
   useEffect(() => {

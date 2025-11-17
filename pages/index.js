@@ -30,35 +30,75 @@ export default function Home() {
       return;
     }
 
+    let userData;
     try {
-      setUserData(JSON.parse(savedUserData));
+      userData = JSON.parse(savedUserData);
+      setUserData(userData);
     } catch (e) {
       console.error("Error parsing user data:", e);
       router.push("/register");
       return;
     }
 
-    // Load progress from localStorage
-    const savedProgress = localStorage.getItem("gameProgress");
-    if (savedProgress) {
-      try {
-        setGameProgress(JSON.parse(savedProgress));
-      } catch (e) {
-        console.error("Error parsing game progress:", e);
+    // Check if user ID exists in users.json and load progress
+    const checkUserExistsAndLoadProgress = async () => {
+      const userId = userData.id || localStorage.getItem("userId");
+      
+      // First, load existing progress
+      const savedProgress = localStorage.getItem("gameProgress");
+      if (savedProgress) {
+        try {
+          setGameProgress(JSON.parse(savedProgress));
+        } catch (e) {
+          console.error("Error parsing game progress:", e);
+        }
       }
-    }
 
-    const savedDroplet = localStorage.getItem("commitmentDroplet");
-    if (savedDroplet) {
-      try {
-        setCommitmentDroplet(JSON.parse(savedDroplet));
-      } catch (e) {
-        console.error("Error parsing commitment droplet:", e);
+      const savedDroplet = localStorage.getItem("commitmentDroplet");
+      if (savedDroplet) {
+        try {
+          setCommitmentDroplet(JSON.parse(savedDroplet));
+        } catch (e) {
+          console.error("Error parsing commitment droplet:", e);
+          setCommitmentDroplet(null);
+        }
+      } else {
         setCommitmentDroplet(null);
       }
-    } else {
-      setCommitmentDroplet(null);
-    }
+
+      // Then check if user exists in users.json
+      if (!userId) {
+        // No user ID, allow them to continue (new user)
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/users/check-id", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userId }),
+        });
+
+        const data = await response.json();
+        
+        if (!data.exists) {
+          // User ID not in users.json, clear localStorage and redirect to register
+          localStorage.removeItem("userData");
+          localStorage.removeItem("userId");
+          localStorage.removeItem("gameProgress");
+          localStorage.removeItem("commitmentDroplet");
+          router.push("/register");
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking user ID:", error);
+        // On error, continue with existing progress
+      }
+    };
+
+    checkUserExistsAndLoadProgress();
   }, [router]);
 
   const allGamesCompleted =

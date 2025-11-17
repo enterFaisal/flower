@@ -27,27 +27,70 @@ export default function PersonalityQuiz() {
 
   // Check if user has completed previous game
   useEffect(() => {
-    const savedProgress = localStorage.getItem("gameProgress");
-    if (savedProgress) {
-      try {
-        const progress = JSON.parse(savedProgress);
-        if (!progress.flowerGame) {
-          alert("يجب إكمال بكم نزهر أولاً!");
-          router.replace("/");
-          return;
+    const checkUserAndProgress = async () => {
+      // First check if user ID exists in users.json
+      const savedUserData = localStorage.getItem("userData");
+      if (savedUserData) {
+        try {
+          const userData = JSON.parse(savedUserData);
+          const userId = userData.id || localStorage.getItem("userId");
+          
+          if (userId) {
+            try {
+              const response = await fetch("/api/users/check-id", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ userId }),
+              });
+
+              const data = await response.json();
+              
+              if (!data.exists) {
+                // User ID not in users.json, clear localStorage and redirect to register
+                localStorage.removeItem("userData");
+                localStorage.removeItem("userId");
+                localStorage.removeItem("gameProgress");
+                localStorage.removeItem("commitmentDroplet");
+                router.push("/register");
+                return;
+              }
+            } catch (error) {
+              console.error("Error checking user ID:", error);
+              // On error, continue with existing check
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing user data:", e);
         }
-        if (progress.personalityQuiz) {
-          alert("لقد أكملت هذا النشاط مسبقًا.");
-          router.replace("/");
-          return;
-        }
-      } catch (e) {
-        console.error("Error parsing game progress:", e);
       }
-    } else {
-      router.replace("/");
-      return;
-    }
+
+      // If user exists in users.json, check progress normally
+      const savedProgress = localStorage.getItem("gameProgress");
+      if (savedProgress) {
+        try {
+          const progress = JSON.parse(savedProgress);
+          if (!progress.flowerGame) {
+            alert("يجب إكمال بكم نزهر أولاً!");
+            router.replace("/");
+            return;
+          }
+          if (progress.personalityQuiz) {
+            alert("لقد أكملت هذا النشاط مسبقًا.");
+            router.replace("/");
+            return;
+          }
+        } catch (e) {
+          console.error("Error parsing game progress:", e);
+        }
+      } else {
+        router.replace("/");
+        return;
+      }
+    };
+
+    checkUserAndProgress();
   }, []);
 
   useEffect(() => {
