@@ -20,6 +20,61 @@ export default function PersonalityQuiz() {
   const [result, setResult] = useState(null);
   const [userIdentifiers, setUserIdentifiers] = useState({ id: "", phone: "" });
 
+  // Check completion status when page becomes visible (prevents back button replay)
+  useEffect(() => {
+    const checkCompletionOnVisibility = async () => {
+      const savedUserData = localStorage.getItem("userData");
+      if (!savedUserData) return;
+
+      try {
+        const userData = JSON.parse(savedUserData);
+        const userId = userData.id || localStorage.getItem("userId");
+        const userPhone = userData.phone || "";
+
+        if (!userId && !userPhone) return;
+
+        const response = await fetch("/api/users/get-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(userId ? { userId } : {}),
+            ...(userPhone ? { phone: userPhone } : {}),
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user) {
+            const serverLevel = data.user.flower?.level || 0;
+            if (serverLevel >= 2 && !showResult) {
+              // User already completed, redirect if not on result page
+              alert("لقد أكملت هذا النشاط مسبقًا.");
+              window.location.href = "https://mewa-event.uselines.com/";
+            }
+          }
+        }
+      } catch (error) {
+        // Silently fail - don't interrupt user experience
+      }
+    };
+
+    // Check on visibility change (when user navigates back)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkCompletionOnVisibility();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // Also check on focus (when user switches back to tab)
+    window.addEventListener("focus", checkCompletionOnVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", checkCompletionOnVisibility);
+    };
+  }, [showResult, router]);
+
   // Preload images on mount
   useEffect(() => {
     preloadRouteImages("/personality-quiz");
@@ -90,26 +145,76 @@ export default function PersonalityQuiz() {
         }
       }
 
-      // If user exists in users.json, check progress normally
+      // Check server-side level to prevent replay (more secure than localStorage)
+      const userId = userData?.id || localStorage.getItem("userId");
+      const userPhone = userData?.phone || "";
+
+      if (userId || userPhone) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+          const response = await fetch("/api/users/get-user", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              ...(userId ? { userId } : {}),
+              ...(userPhone ? { phone: userPhone } : {}),
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.user) {
+            const serverLevel = data.user.flower?.level || 0;
+            // Must complete flower game (level >= 1) before personality quiz
+            if (serverLevel < 1) {
+              alert("يجب إكمال بكم نزهر أولاً!");
+              window.location.href = "https://mewa-event.uselines.com/";
+              return;
+            }
+            // If user has level >= 2, they already completed personality quiz
+            if (serverLevel >= 2) {
+              alert("لقد أكملت هذا النشاط مسبقًا.");
+              window.location.href = "https://mewa-event.uselines.com/";
+              return;
+            }
+            }
+          }
+        } catch (error) {
+          if (error.name === "AbortError") {
+            console.warn("User check timed out - checking localStorage as fallback");
+          } else {
+            console.error("Error checking server-side level:", error);
+          }
+        }
+      }
+
+      // Fallback to localStorage check if server check fails or no user ID
       const savedProgress = localStorage.getItem("gameProgress");
       if (savedProgress) {
         try {
           const progress = JSON.parse(savedProgress);
           if (!progress.flowerGame) {
             alert("يجب إكمال بكم نزهر أولاً!");
-            router.replace("/");
+            window.location.href = "https://mewa-event.uselines.com/";
             return;
           }
           if (progress.personalityQuiz) {
             alert("لقد أكملت هذا النشاط مسبقًا.");
-            router.replace("/");
+            window.location.href = "https://mewa-event.uselines.com/";
             return;
           }
         } catch (e) {
           console.error("Error parsing game progress:", e);
         }
       } else {
-        router.replace("/");
+        window.location.href = "https://mewa-event.uselines.com/";
         return;
       }
     };
@@ -224,7 +329,7 @@ export default function PersonalityQuiz() {
   };
 
   const handleBackToPortal = () => {
-    router.push("/");
+    window.location.href = "https://mewa-event.uselines.com/";
   };
 
   return (

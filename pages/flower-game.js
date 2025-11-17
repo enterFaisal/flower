@@ -93,6 +93,63 @@ export default function FlowerGame() {
     }
   }, [selectedPlant]);
 
+  // Check completion status when page becomes visible (prevents back button replay)
+  useEffect(() => {
+    const checkCompletionOnVisibility = async () => {
+      const savedUserData = localStorage.getItem("userData");
+      if (!savedUserData) return;
+
+      try {
+        const userData = JSON.parse(savedUserData);
+        const userId = userData.id || localStorage.getItem("userId");
+        const userPhone = userData.phone || "";
+
+        if (!userId && !userPhone) return;
+
+        const response = await fetch("/api/users/get-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(userId ? { userId } : {}),
+            ...(userPhone ? { phone: userPhone } : {}),
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user) {
+            const serverLevel = data.user.flower?.level || 0;
+            if (serverLevel >= 1 && currentStep !== "result") {
+              // User already completed, redirect if not on result page
+              alert("لقد أكملت هذا النشاط مسبقًا.");
+              // send the user to mewa-event.uselines.com/
+              window.location.href = "https://mewa-event.uselines.com/";
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        // Silently fail - don't interrupt user experience
+      }
+    };
+
+    // Check on visibility change (when user navigates back)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkCompletionOnVisibility();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // Also check on focus (when user switches back to tab)
+    window.addEventListener("focus", checkCompletionOnVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", checkCompletionOnVisibility);
+    };
+  }, [currentStep, router]);
+
   useEffect(() => {
     // Get user data from localStorage
     const savedUserData = localStorage.getItem("userData");
@@ -159,23 +216,65 @@ export default function FlowerGame() {
     // Check if user ID exists in users.json
     const checkUserAndProgress = async () => {
       const userId = userData.id || localStorage.getItem("userId");
-      if (!userId) {
-        // No user ID, allow them to play (new user)
+      const userPhone = userData.phone || "";
+
+      if (!userId && !userPhone) {
+        // No user ID or phone, allow them to play (new user)
         return;
       }
 
-      // Check if they already completed first (local check is faster)
-      const savedProgress = localStorage.getItem("gameProgress");
-      if (savedProgress) {
-        try {
-          const progress = JSON.parse(savedProgress);
-          if (progress.flowerGame) {
-            alert("لقد أكملت هذا النشاط مسبقًا.");
-            router.replace("/");
-            return;
+      // Check server-side level to prevent replay (more secure than localStorage)
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch("/api/users/get-user", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...(userId ? { userId } : {}),
+            ...(userPhone ? { phone: userPhone } : {}),
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user) {
+            const serverLevel = data.user.flower?.level || 0;
+            // If user has level >= 1, they already completed flower game
+            if (serverLevel >= 1) {
+              alert("لقد أكملت هذا النشاط مسبقًا.");
+              window.location.href = "https://mewa-event.uselines.com/";
+              return;
+            }
           }
-        } catch (e) {
-          console.error("Error parsing game progress:", e);
+        }
+      } catch (error) {
+        if (error.name === "AbortError") {
+          console.warn(
+            "User check timed out - checking localStorage as fallback"
+          );
+        } else {
+          console.error("Error checking server-side level:", error);
+        }
+        // Fallback to localStorage check if server check fails
+        const savedProgress = localStorage.getItem("gameProgress");
+        if (savedProgress) {
+          try {
+            const progress = JSON.parse(savedProgress);
+            if (progress.flowerGame) {
+              alert("لقد أكملت هذا النشاط مسبقًا.");
+              window.location.href = "https://mewa-event.uselines.com/";
+              return;
+            }
+          } catch (e) {
+            console.error("Error parsing game progress:", e);
+          }
         }
       }
 
@@ -472,7 +571,7 @@ export default function FlowerGame() {
   };
 
   const handleBackToPortal = () => {
-    router.push("/");
+    window.location.href = "https://mewa-event.uselines.com/";
   };
 
   const currentQuestion = selectedPlant?.questions[currentQuestionIndex];
