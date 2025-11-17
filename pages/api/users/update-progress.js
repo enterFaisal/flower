@@ -19,9 +19,17 @@ function readUsers() {
 }
 
 function writeUsers(users) {
-  fs.writeFileSync(usersFilePath, JSON.stringify(users, null, 2), "utf8");
-  // Create backup after writing
-  backupUsersFile(usersFilePath);
+  try {
+    // Write to a temporary file first, then rename (atomic operation)
+    const tempFilePath = usersFilePath + ".tmp";
+    fs.writeFileSync(tempFilePath, JSON.stringify(users, null, 2), "utf8");
+    fs.renameSync(tempFilePath, usersFilePath);
+    // Create backup after writing
+    backupUsersFile(usersFilePath);
+  } catch (error) {
+    console.error("Error writing users file:", error);
+    throw error;
+  }
 }
 
 export default async function handler(req, res) {
@@ -30,13 +38,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const {
-      userId,
-      phone,
-      level,
-      flower,
-      commitmentPercentage,
-    } = req.body || {};
+    const { userId, phone, level, flower, commitmentPercentage } =
+      req.body || {};
 
     if (!userId && !phone) {
       return res.status(400).json({ error: "userId or phone is required" });
@@ -74,32 +77,47 @@ export default async function handler(req, res) {
     const currentLevelBefore =
       typeof user.flower.level === "number" ? user.flower.level : 0;
     console.log(
-      `[Update Progress] User: ${user.name || user.phone}, Current level: ${currentLevelBefore}, New level: ${level}`
+      `[Update Progress] User: ${
+        user.name || user.phone
+      }, Current level: ${currentLevelBefore}, New level: ${level}`
     );
 
-    // Update level first using Math.max to ensure it only increases
+    // CRITICAL: Update level FIRST and ensure it's always preserved
+    // This must happen before any flower object updates to prevent overwriting
+    let targetLevel = null;
     if (typeof level === "number") {
       const currentLevel =
         typeof user.flower.level === "number" ? user.flower.level : 0;
-      const newLevel = Math.max(currentLevel, level);
-      user.flower.level = newLevel;
+      targetLevel = Math.max(currentLevel, level);
+      // Set level immediately and ensure it's not overwritten
+      user.flower.level = targetLevel;
       console.log(
-        `[Update Progress] Level updated from ${currentLevel} to ${newLevel}`
+        `[Update Progress] Level set to ${targetLevel} (was ${currentLevel}, requested ${level})`
       );
+    } else {
+      // Preserve existing level if no new level provided
+      targetLevel =
+        typeof user.flower.level === "number" ? user.flower.level : 0;
     }
 
-    // Update flower properties, but preserve the level that was just set
+    // Update flower properties, but ALWAYS preserve the level that was just set
     // This prevents the flower object from overwriting a higher level
     if (flower && typeof flower === "object") {
-      const preservedLevel = user.flower.level; // Save current level
+      // Remove level from flower object if present to prevent conflicts
+      const { level: flowerLevel, ...flowerWithoutLevel } = flower;
       user.flower = {
         ...user.flower,
-        ...flower,
+        ...flowerWithoutLevel,
       };
-      // Restore level if it was decreased by the spread
-      if (typeof preservedLevel === "number") {
-        const newLevel = user.flower.level || 0;
-        user.flower.level = Math.max(preservedLevel, newLevel);
+      // CRITICAL: Always restore/update level after spreading flower object
+      // This ensures level is never decreased
+      if (typeof targetLevel === "number") {
+        const currentLevelAfterSpread =
+          typeof user.flower.level === "number" ? user.flower.level : 0;
+        user.flower.level = Math.max(targetLevel, currentLevelAfterSpread);
+        console.log(
+          `[Update Progress] Level preserved after flower update: ${user.flower.level}`
+        );
       }
     }
 
@@ -109,9 +127,56 @@ export default async function handler(req, res) {
 
     user.updatedAt = new Date().toISOString();
     users[userIndex] = user;
-    writeUsers(users);
 
-    return res.status(200).json({ success: true, user });
+    // Write users file and verify it was written correctly
+    try {
+      writeUsers(users);
+
+      // Verify the write by reading back and checking the level
+      const verifyUsers = readUsers();
+      const verifyUser = verifyUsers.find((u) => {
+        if (userId && u.id === userId) return true;
+        if (sanitizedPhone && u.phone === sanitizedPhone) return true;
+        return false;
+      });
+
+      if (verifyUser && verifyUser.flower) {
+        const verifiedLevel = verifyUser.flower.level || 0;
+        console.log(
+          `[Update Progress] Verification: Level in file is ${verifiedLevel}, expected ${user.flower.level}`
+        );
+        if (typeof targetLevel === "number" && verifiedLevel !== targetLevel) {
+          console.error(
+            `[Update Progress] WARNING: Level mismatch! File has ${verifiedLevel}, expected ${targetLevel}`
+          );
+          // Try to fix it
+          verifyUser.flower.level = targetLevel;
+          verifyUser.updatedAt = new Date().toISOString();
+          const verifyUserIndex = verifyUsers.findIndex((u) => {
+            if (userId && u.id === userId) return true;
+            if (sanitizedPhone && u.phone === sanitizedPhone) return true;
+            return false;
+          });
+          if (verifyUserIndex !== -1) {
+            verifyUsers[verifyUserIndex] = verifyUser;
+            writeUsers(verifyUsers);
+            console.log(
+              `[Update Progress] Fixed level mismatch, retried write`
+            );
+          }
+        }
+      }
+    } catch (writeError) {
+      console.error("[Update Progress] Error writing users file:", writeError);
+      throw writeError;
+    }
+
+    return res.status(200).json({
+      success: true,
+      user,
+      levelUpdated: typeof level === "number",
+      finalLevel: user.flower.level,
+    });
   } catch (error) {
     console.error("Update progress error:", error);
     return res.status(500).json({ error: "Internal server error" });

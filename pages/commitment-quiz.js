@@ -6,6 +6,7 @@ import Image from "next/image";
 import logo from "../brand/logo.png";
 import pattern1 from "../brand/Pattern(1).png";
 import { preloadRouteImages } from "../lib/imagePreloader";
+import { io } from "socket.io-client";
 
 const CategoryIcon = ({ icon, alt, size = 48 }) => {
   if (icon) {
@@ -75,6 +76,8 @@ const dropletMilestones = [
     colorHex: "#5BC0F8",
   },
 ];
+
+let socket;
 
 export default function CommitmentQuiz() {
   const router = useRouter();
@@ -148,6 +151,108 @@ export default function CommitmentQuiz() {
   // Preload images on mount
   useEffect(() => {
     preloadRouteImages("/commitment-quiz");
+  }, []);
+
+  // Initialize socket connection
+  useEffect(() => {
+    const socketInitializer = async () => {
+      try {
+        const response = await fetch("/api/socket");
+        if (!response.ok) {
+          console.warn(
+            "Socket initialization returned non-OK status:",
+            response.status
+          );
+          // Continue anyway, socket might already be initialized
+        }
+        socket = io({
+          path: "/api/socket",
+          transports: ["websocket", "polling"],
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionAttempts: 5,
+        });
+
+        socket.on("connect", () => {
+          console.log("[Commitment Quiz] Connected to socket server");
+        });
+
+        socket.on("connect_error", (error) => {
+          console.warn("[Commitment Quiz] Socket connection error:", error);
+        });
+      } catch (error) {
+        console.warn("[Commitment Quiz] Failed to initialize socket:", error);
+        // Continue without socket - will fallback to HTTP API
+      }
+    };
+
+    socketInitializer();
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, []);
+
+  // Retry any pending level updates on mount
+  useEffect(() => {
+    const retryPendingUpdate = async () => {
+      try {
+        const pendingUpdate = localStorage.getItem("pendingLevelUpdate");
+        if (pendingUpdate) {
+          const backupData = JSON.parse(pendingUpdate);
+          console.log(
+            "[Retry Pending] Found pending level update, retrying...",
+            backupData
+          );
+
+          // Get user identifiers from localStorage
+          const savedUserData = localStorage.getItem("userData");
+          let userId = "";
+          let phone = "";
+
+          if (savedUserData) {
+            try {
+              const userData = JSON.parse(savedUserData);
+              userId = userData.id || backupData.userId || "";
+              phone = userData.phone || backupData.phone || "";
+            } catch (e) {
+              userId = backupData.userId || "";
+              phone = backupData.phone || "";
+            }
+          } else {
+            userId = backupData.userId || "";
+            phone = backupData.phone || "";
+          }
+
+          if (!userId && !phone) {
+            console.warn(
+              "[Retry Pending] No user identifiers found, cannot retry"
+            );
+            return;
+          }
+
+          // Call persistLevel with the stored data
+          const success = await persistLevel(
+            backupData.level,
+            backupData.commitmentPercentage
+          );
+
+          if (success) {
+            localStorage.removeItem("pendingLevelUpdate");
+            console.log(
+              "[Retry Pending] Successfully retried pending level update"
+            );
+          }
+        }
+      } catch (error) {
+        console.error("[Retry Pending] Error retrying pending update:", error);
+      }
+    };
+
+    retryPendingUpdate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Check if user has completed previous games
@@ -318,7 +423,15 @@ export default function CommitmentQuiz() {
     }
   }, [router]);
 
-  const persistLevel = async (level, commitmentPercentageValue) => {
+  const persistLevel = async (
+    level,
+    commitmentPercentageValue,
+    retryCount = 0
+  ) => {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000; // 1 second
+    const SOCKET_TIMEOUT = 5000; // 5 seconds
+
     // Get user data directly from localStorage as fallback
     // This ensures we have the data even if state hasn't updated
     let userId = userIdentifiers.id;
@@ -339,20 +452,81 @@ export default function CommitmentQuiz() {
 
     if (!userId && !phone) {
       console.warn("Cannot persist level: no user ID or phone found");
-      return;
+      return false;
     }
 
-    try {
-      const payload = {
-        ...(userId ? { userId } : {}),
-        ...(phone ? { phone } : {}),
-        level,
-        ...(typeof commitmentPercentageValue === "number"
-          ? { commitmentPercentage: commitmentPercentageValue }
-          : {}),
-      };
+    const payload = {
+      ...(userId ? { userId } : {}),
+      ...(phone ? { phone } : {}),
+      level,
+      ...(typeof commitmentPercentageValue === "number"
+        ? { commitmentPercentage: commitmentPercentageValue }
+        : {}),
+    };
 
-      console.log("Persisting level:", level, "for user:", { userId, phone });
+    console.log(
+      `[Persist Level] Attempt ${retryCount + 1}/${
+        MAX_RETRIES + 1
+      }: Persisting level ${level} for user:`,
+      { userId, phone }
+    );
+
+    // Try WebSocket first, fallback to HTTP API
+    if (socket && socket.connected) {
+      try {
+        console.log("[Persist Level] Using WebSocket to update level");
+
+        const result = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error("Socket timeout"));
+          }, SOCKET_TIMEOUT);
+
+          const successHandler = (data) => {
+            clearTimeout(timeout);
+            socket.off("level:update:success", successHandler);
+            socket.off("level:update:error", errorHandler);
+            resolve(data);
+          };
+
+          const errorHandler = (error) => {
+            clearTimeout(timeout);
+            socket.off("level:update:success", successHandler);
+            socket.off("level:update:error", errorHandler);
+            reject(new Error(error.error || "Socket update failed"));
+          };
+
+          socket.once("level:update:success", successHandler);
+          socket.once("level:update:error", errorHandler);
+          socket.emit("level:update", payload);
+        });
+
+        // Verify that the level was actually updated
+        if (result.success && result.finalLevel !== undefined) {
+          if (result.finalLevel >= level) {
+            console.log(
+              `[Persist Level] WebSocket Success! Level persisted: ${result.finalLevel} (requested: ${level})`
+            );
+            return true;
+          } else {
+            console.warn(
+              `[Persist Level] Level mismatch: got ${result.finalLevel}, expected ${level}. Retrying...`
+            );
+            throw new Error("Level mismatch in response");
+          }
+        } else {
+          throw new Error("Invalid response format");
+        }
+      } catch (socketError) {
+        console.warn(
+          `[Persist Level] WebSocket failed: ${socketError.message}, falling back to HTTP API`
+        );
+        // Fall through to HTTP API fallback
+      }
+    }
+
+    // Fallback to HTTP API if WebSocket is not available or failed
+    try {
+      console.log("[Persist Level] Using HTTP API to update level");
 
       const response = await fetch("/api/users/update-progress", {
         method: "POST",
@@ -372,10 +546,67 @@ export default function CommitmentQuiz() {
       }
 
       const result = await response.json();
-      console.log("Level persisted successfully:", result);
+
+      // Verify that the level was actually updated
+      if (result.success && result.finalLevel !== undefined) {
+        if (result.finalLevel >= level) {
+          console.log(
+            `[Persist Level] HTTP API Success! Level persisted: ${result.finalLevel} (requested: ${level})`
+          );
+          return true;
+        } else {
+          console.warn(
+            `[Persist Level] Level mismatch: got ${result.finalLevel}, expected ${level}. Retrying...`
+          );
+          throw new Error("Level mismatch in response");
+        }
+      } else {
+        console.warn(
+          "[Persist Level] Response missing verification data. Retrying..."
+        );
+        throw new Error("Invalid response format");
+      }
     } catch (error) {
-      console.error("Failed to persist level:", error);
-      // Don't throw - allow user to continue even if API call fails
+      console.error(
+        `[Persist Level] Attempt ${retryCount + 1} failed:`,
+        error.message
+      );
+
+      // Retry if we haven't exceeded max retries
+      if (retryCount < MAX_RETRIES) {
+        console.log(
+          `[Persist Level] Retrying in ${RETRY_DELAY}ms... (${
+            retryCount + 1
+          }/${MAX_RETRIES})`
+        );
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        return persistLevel(level, commitmentPercentageValue, retryCount + 1);
+      } else {
+        console.error(
+          "[Persist Level] All retry attempts failed. Level may not be persisted.",
+          error
+        );
+        // Store in localStorage as backup so we can retry later
+        try {
+          const backupData = {
+            level,
+            commitmentPercentage: commitmentPercentageValue,
+            userId,
+            phone,
+            timestamp: new Date().toISOString(),
+          };
+          localStorage.setItem(
+            "pendingLevelUpdate",
+            JSON.stringify(backupData)
+          );
+          console.log(
+            "[Persist Level] Stored backup in localStorage for later retry"
+          );
+        } catch (e) {
+          console.error("[Persist Level] Failed to store backup:", e);
+        }
+        return false;
+      }
     }
   };
 
@@ -392,7 +623,7 @@ export default function CommitmentQuiz() {
         )
       : null;
 
-  const handleAnswerClick = (answer) => {
+  const handleAnswerClick = async (answer) => {
     const newScore = totalScore + answer.points;
     setTotalScore(newScore);
 
@@ -437,7 +668,13 @@ export default function CommitmentQuiz() {
       progress.commitmentQuiz = true;
       localStorage.setItem("gameProgress", JSON.stringify(progress));
 
-      persistLevel(3, calculatedFinalPercentage);
+      // Persist level and wait for it to complete (with retries)
+      const success = await persistLevel(3, calculatedFinalPercentage);
+      if (!success) {
+        console.warn(
+          "[Commitment Quiz] Level update failed, but user can continue. Update will be retried."
+        );
+      }
     }
   };
 

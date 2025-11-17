@@ -17,6 +17,20 @@ function getUsers() {
   return [];
 }
 
+function writeUsers(users) {
+  try {
+    // Write to a temporary file first, then rename (atomic operation)
+    const tempFilePath = usersFilePath + ".tmp";
+    fs.writeFileSync(tempFilePath, JSON.stringify(users, null, 2), "utf8");
+    fs.renameSync(tempFilePath, usersFilePath);
+    // Create backup after writing
+    backupUsersFile(usersFilePath);
+  } catch (error) {
+    console.error("Error writing users file:", error);
+    throw error;
+  }
+}
+
 function updateUserWithFlower(flowerData) {
   try {
     const users = getUsers();
@@ -27,49 +41,86 @@ function updateUserWithFlower(flowerData) {
     }
 
     if (userIndex === -1 && flowerData.phone) {
-      userIndex = users.findIndex((u) => u.phone === flowerData.phone);
+      const sanitizedPhone = flowerData.phone
+        ? flowerData.phone.trim().replace(/\s+/g, "")
+        : null;
+      if (sanitizedPhone) {
+        userIndex = users.findIndex((u) => u.phone === sanitizedPhone);
+      }
     }
 
     if (userIndex !== -1) {
+      const user = users[userIndex];
+
       // Initialize flower object if it doesn't exist
-      if (!users[userIndex].flower) {
-        users[userIndex].flower = {};
+      if (!user.flower) {
+        user.flower = {};
       }
-      
-      // Update flower properties, preserving existing data
-      users[userIndex].flower = {
-        ...users[userIndex].flower,
-        seedName: flowerData.seedName,
-        flowerImage: flowerData.flowerImage,
-      };
-      
-      // Update level using Math.max to prevent downgrading
-      // This ensures level only increases, never decreases
+
+      // CRITICAL: Update level FIRST and ensure it's always preserved
+      // This must happen before any flower object updates to prevent overwriting
+      let targetLevel = null;
       if (typeof flowerData.level === "number") {
         const currentLevel =
-          typeof users[userIndex].flower.level === "number"
-            ? users[userIndex].flower.level
-            : 0;
-        users[userIndex].flower.level = Math.max(currentLevel, flowerData.level);
+          typeof user.flower.level === "number" ? user.flower.level : 0;
+        targetLevel = Math.max(currentLevel, flowerData.level);
+        user.flower.level = targetLevel;
+        console.log(
+          `[Socket Update] Level set to ${targetLevel} (was ${currentLevel}, requested ${flowerData.level})`
+        );
+      } else {
+        targetLevel =
+          typeof user.flower.level === "number" ? user.flower.level : 0;
       }
-      
+
+      // Update flower properties, but ALWAYS preserve the level that was just set
+      if (flowerData.seedName || flowerData.flowerImage) {
+        const { level: flowerLevel, ...flowerWithoutLevel } = {
+          seedName: flowerData.seedName,
+          flowerImage: flowerData.flowerImage,
+        };
+        user.flower = {
+          ...user.flower,
+          ...flowerWithoutLevel,
+        };
+        // CRITICAL: Always restore/update level after spreading flower object
+        if (typeof targetLevel === "number") {
+          const currentLevelAfterSpread =
+            typeof user.flower.level === "number" ? user.flower.level : 0;
+          user.flower.level = Math.max(targetLevel, currentLevelAfterSpread);
+        }
+      }
+
+      // Update commitmentPercentage if provided
+      if (typeof flowerData.commitmentPercentage === "number") {
+        user.commitmentPercentage = flowerData.commitmentPercentage;
+      }
+
       if (flowerData.userName) {
-        users[userIndex].name = flowerData.userName;
+        user.name = flowerData.userName;
       }
-      users[userIndex].updatedAt = new Date().toISOString();
+      user.updatedAt = new Date().toISOString();
+      users[userIndex] = user;
 
-      fs.writeFileSync(usersFilePath, JSON.stringify(users, null, 2));
+      // Write users file atomically
+      writeUsers(users);
 
-      // Create backup after writing
-      backupUsersFile(usersFilePath);
+      console.log(
+        `[Socket Update] Successfully updated user: ${
+          user.name || user.phone
+        }, level: ${user.flower.level}`
+      );
+      return { success: true, user, finalLevel: user.flower.level };
     } else {
       console.error("User not found for provided identifiers:", {
         userId: flowerData.userId,
         phone: flowerData.phone,
       });
+      return { success: false, error: "User not found" };
     }
   } catch (error) {
     console.error("Error saving flower data to user:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -101,11 +152,46 @@ const SocketHandler = (req, res) => {
 
         socket.on("flower:new", (data) => {
           console.log("New flower received, updating user data:", data);
-          updateUserWithFlower(data);
+          const result = updateUserWithFlower(data);
           // Broadcast to all connected clients.
           // The live display will get this, but it will also poll.
           // This provides a real-time push for any client that wants it.
           io.emit("flower:new", data);
+          // Send confirmation back to the sender
+          if (result.success) {
+            socket.emit("flower:update:success", {
+              success: true,
+              finalLevel: result.finalLevel,
+            });
+          } else {
+            socket.emit("flower:update:error", {
+              success: false,
+              error: result.error,
+            });
+          }
+        });
+
+        socket.on("level:update", (data) => {
+          console.log("Level update received via socket:", data);
+          const result = updateUserWithFlower({
+            userId: data.userId,
+            phone: data.phone,
+            level: data.level,
+            commitmentPercentage: data.commitmentPercentage,
+          });
+          // Send confirmation back to the sender
+          if (result.success) {
+            socket.emit("level:update:success", {
+              success: true,
+              finalLevel: result.finalLevel,
+              levelUpdated: typeof data.level === "number",
+            });
+          } else {
+            socket.emit("level:update:error", {
+              success: false,
+              error: result.error,
+            });
+          }
         });
 
         socket.on("disconnect", () => {
