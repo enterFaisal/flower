@@ -33,12 +33,47 @@ export default function Home() {
     let userData;
     try {
       userData = JSON.parse(savedUserData);
-      setUserData(userData);
     } catch (e) {
       console.error("Error parsing user data:", e);
       router.push("/register");
       return;
     }
+
+    // Validate that user actually completed registration
+    // Check for required fields that are only set after successful registration
+    if (!userData.id || !userData.name || !userData.phone || !userData.employeeId) {
+      // Missing required fields - not a valid registration
+      console.warn("User data missing required fields, redirecting to register");
+      localStorage.removeItem("userData");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("gameProgress");
+      localStorage.removeItem("commitmentDroplet");
+      router.push("/register");
+      return;
+    }
+
+    // Check if user has registeredAt (proves they completed registration)
+    // If not present, they might have old/invalid data
+    if (!userData.registeredAt) {
+      // No registration timestamp - might be old/invalid data
+      // But allow if they have a valid UUID format ID (proves they registered)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const timestampIdRegex = /^\d{13,}-\d+$/; // Format: timestamp-random
+      
+      if (!uuidRegex.test(userData.id) && !timestampIdRegex.test(userData.id)) {
+        // ID is not a valid UUID or timestamp format - likely invalid data
+        console.warn("User ID is not in valid format, redirecting to register");
+        localStorage.removeItem("userData");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("gameProgress");
+        localStorage.removeItem("commitmentDroplet");
+        router.push("/register");
+        return;
+      }
+    }
+
+    // User data is valid, set it
+    setUserData(userData);
 
     // Check if user ID exists in users.json and load progress
     const checkUserExistsAndLoadProgress = async () => {

@@ -104,14 +104,57 @@ export default function FlowerGame() {
     let userData;
     try {
       userData = JSON.parse(savedUserData);
-      setUserName(userData.name);
-      setUserPhone(userData.phone);
-      setUserId(userData.id || "");
     } catch (e) {
       console.error("Error parsing user data:", e);
       router.push("/register");
       return;
     }
+
+    // Validate that user actually completed registration
+    // Check for required fields that are only set after successful registration
+    if (
+      !userData.id ||
+      !userData.name ||
+      !userData.phone ||
+      !userData.employeeId
+    ) {
+      // Missing required fields - not a valid registration
+      console.warn(
+        "User data missing required fields, redirecting to register"
+      );
+      localStorage.removeItem("userData");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("gameProgress");
+      localStorage.removeItem("commitmentDroplet");
+      router.push("/register");
+      return;
+    }
+
+    // Check if user has registeredAt (proves they completed registration)
+    // If not present, they might have old/invalid data
+    if (!userData.registeredAt) {
+      // No registration timestamp - might be old/invalid data
+      // But allow if they have a valid UUID format ID (proves they registered)
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const timestampIdRegex = /^\d{13,}-\d+$/; // Format: timestamp-random
+
+      if (!uuidRegex.test(userData.id) && !timestampIdRegex.test(userData.id)) {
+        // ID is not a valid UUID or timestamp format - likely invalid data
+        console.warn("User ID is not in valid format, redirecting to register");
+        localStorage.removeItem("userData");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("gameProgress");
+        localStorage.removeItem("commitmentDroplet");
+        router.push("/register");
+        return;
+      }
+    }
+
+    // User data is valid, set it
+    setUserName(userData.name);
+    setUserPhone(userData.phone);
+    setUserId(userData.id || "");
 
     // Check if user ID exists in users.json
     const checkUserAndProgress = async () => {
@@ -155,25 +198,30 @@ export default function FlowerGame() {
 
         // Only proceed if response is OK and we got valid JSON
         if (!response.ok) {
-          console.warn("User check API returned non-OK status:", response.status);
+          console.warn(
+            "User check API returned non-OK status:",
+            response.status
+          );
           // Continue anyway - don't block user on API errors
           return;
         }
 
         const data = await response.json();
-        
+
         // Only act if we got a valid response with success: true
         // If user doesn't exist in users.json, log a warning but don't block them
         // This prevents issues on mobile where network might be unreliable
         // or where the user just registered and the check happens too quickly
         if (data.success === true && data.exists === false) {
-          console.warn("User ID not found in users.json, but user has localStorage data. Allowing access.");
+          console.warn(
+            "User ID not found in users.json, but user has localStorage data. Allowing access."
+          );
           // Don't clear localStorage - allow user to continue
           // The user might have just registered and the check happened too quickly
           // Or there might be a sync issue between registration and the check
           return;
         }
-        
+
         // If user exists, continue normally
         if (data.success === true && data.exists === true) {
           // User exists, everything is fine
@@ -181,7 +229,7 @@ export default function FlowerGame() {
         }
       } catch (error) {
         // Network error, timeout, or other fetch errors
-        if (error.name === 'AbortError') {
+        if (error.name === "AbortError") {
           console.warn("User check timed out - continuing anyway");
         } else {
           console.error("Error checking user ID:", error);
