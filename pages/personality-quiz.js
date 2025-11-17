@@ -37,28 +37,52 @@ export default function PersonalityQuiz() {
           
           if (userId) {
             try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
               const response = await fetch("/api/users/check-id", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({ userId }),
+                signal: controller.signal,
               });
+
+              clearTimeout(timeoutId);
+
+              // Only proceed if response is OK and we got valid JSON
+              if (!response.ok) {
+                console.warn("User check API returned non-OK status:", response.status);
+                // Continue anyway - don't block user on API errors
+                return;
+              }
 
               const data = await response.json();
               
-              if (!data.exists) {
-                // User ID not in users.json, clear localStorage and redirect to register
-                localStorage.removeItem("userData");
-                localStorage.removeItem("userId");
-                localStorage.removeItem("gameProgress");
-                localStorage.removeItem("commitmentDroplet");
-                router.push("/register");
+              // Only act if we got a valid response with success: true
+              // If user doesn't exist in users.json, log a warning but don't block them
+              // This prevents issues on mobile where network might be unreliable
+              if (data.success === true && data.exists === false) {
+                console.warn("User ID not found in users.json, but user has localStorage data. Allowing access.");
+                // Don't clear localStorage - allow user to continue
+                return;
+              }
+              
+              // If user exists, continue normally
+              if (data.success === true && data.exists === true) {
+                // User exists, everything is fine
                 return;
               }
             } catch (error) {
-              console.error("Error checking user ID:", error);
-              // On error, continue with existing check
+              // Network error, timeout, or other fetch errors
+              if (error.name === 'AbortError') {
+                console.warn("User check timed out - continuing anyway");
+              } else {
+                console.error("Error checking user ID:", error);
+              }
+              // On any error, continue - don't block user on network issues
+              // This is especially important on mobile where network can be unreliable
             }
           }
         } catch (e) {
