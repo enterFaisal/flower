@@ -137,26 +137,85 @@ export default function PersonalityQuiz() {
   }, [router]);
 
   const persistLevel = async (level) => {
-    if (!userIdentifiers.id && !userIdentifiers.phone) {
+    // Get user data from localStorage if userIdentifiers is not set yet (common on mobile)
+    let userId = userIdentifiers.id;
+    let phone = userIdentifiers.phone;
+
+    if (!userId && !phone) {
+      try {
+        const savedUserData = localStorage.getItem("userData");
+        if (savedUserData) {
+          const userData = JSON.parse(savedUserData);
+          userId = userData.id || "";
+          phone = userData.phone || "";
+        }
+      } catch (error) {
+        console.error("Error reading user data from localStorage:", error);
+      }
+    }
+
+    if (!userId && !phone) {
+      console.warn("Cannot persist level: no user identifier available");
       return;
     }
 
     try {
       const payload = {
-        ...(userIdentifiers.id ? { userId: userIdentifiers.id } : {}),
-        ...(userIdentifiers.phone ? { phone: userIdentifiers.phone } : {}),
+        ...(userId ? { userId } : {}),
+        ...(phone ? { phone } : {}),
         level,
       };
 
-      await fetch("/api/users/update-progress", {
+      const response = await fetch("/api/users/update-progress", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Failed to persist level:", response.status, errorData);
+        // Retry once after a short delay
+        setTimeout(async () => {
+          try {
+            await fetch("/api/users/update-progress", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            });
+          } catch (retryError) {
+            console.error("Retry failed to persist level:", retryError);
+          }
+        }, 1000);
+      } else {
+        const result = await response.json();
+        console.log("Level persisted successfully:", result);
+      }
     } catch (error) {
       console.error("Failed to persist level:", error);
+      // Retry once after a short delay
+      setTimeout(async () => {
+        try {
+          const retryPayload = {
+            ...(userId ? { userId } : {}),
+            ...(phone ? { phone } : {}),
+            level,
+          };
+          await fetch("/api/users/update-progress", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(retryPayload),
+          });
+        } catch (retryError) {
+          console.error("Retry failed to persist level:", retryError);
+        }
+      }, 1000);
     }
   };
 
