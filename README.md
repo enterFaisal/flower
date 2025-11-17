@@ -69,6 +69,7 @@ PORT=80
 
 - https://mewa-event.uselines.com (for users)
 - https://mewa-event.uselines.com/live-display (for live display)
+- https://mewa-event.uselines.com/giveaway (for giveaway)
 
 ## Data Download
 
@@ -96,18 +97,3 @@ project/
   users-2024-01-15T10-30-45.json  (timestamped backup)
   users.json.backup                (latest backup, always overwritten)
 ```
-
-### Backup Files
-
-- **Timestamped backups**: `users-YYYY-MM-DDTHH-MM-SS.json` - Historical backups with timestamps
-- **Latest backup**: `users.json.backup` - Always contains the most recent version
-
-### When Backups Are Created
-
-Backups are automatically created when:
-
-- A new user registers (`/api/register`)
-- User progress is updated (`/api/users/update-progress`)
-- Flower data is saved via socket (`/api/socket`)
-
-**Note:** Backup failures are logged but won't interrupt the main operation.
