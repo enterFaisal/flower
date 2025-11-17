@@ -34,4 +34,5 @@ next-env.d.ts
 
 # user data
 /data
-
+# backup files
+users*

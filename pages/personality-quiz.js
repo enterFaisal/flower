@@ -228,7 +228,19 @@ export default function PersonalityQuiz() {
           {showResult && result && (
             <div className="max-w-2xl mx-auto animate-pop-in">
               <div className="card bg-white/95 backdrop-blur-md shadow-lg text-center border-2 border-mewa-green-200">
-                <div className="text-8xl mb-6">{result.emoji}</div>
+                {result.image && (
+                  <div className="relative w-48 h-48 mx-auto mb-6">
+                    <Image
+                      src={result.image}
+                      alt={result.name}
+                      fill
+                      sizes="192px"
+                      style={{ objectFit: "contain" }}
+                      priority
+                      quality={90}
+                    />
+                  </div>
+                )}
                 <h2 className="text-4xl font-bold text-mewa-green-700 mb-4">
                   شخصيتك: {result.name}
                 </h2>
@@ -267,10 +279,32 @@ export default function PersonalityQuiz() {
                           className="flex items-center justify-between"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="text-2xl">
-                              {personalityQuizData.personalities[personality]
-                                ?.emoji || "❓"}
-                            </span>
+                            {personalityQuizData.personalities[personality]
+                              ?.image ? (
+                              <div className="relative w-12 h-12 flex-shrink-0">
+                                <Image
+                                  src={
+                                    personalityQuizData.personalities[
+                                      personality
+                                    ]?.image
+                                  }
+                                  alt={
+                                    personalityQuizData.personalities[
+                                      personality
+                                    ]?.name || personality
+                                  }
+                                  fill
+                                  sizes="48px"
+                                  style={{ objectFit: "contain" }}
+                                  loading="lazy"
+                                />
+                              </div>
+                            ) : (
+                              <span className="text-2xl">
+                                {personalityQuizData.personalities[personality]
+                                  ?.emoji || "❓"}
+                              </span>
+                            )}
                             <span className="font-bold text-gray-700">
                               {personalityQuizData.personalities[personality]
                                 ?.name || personality}
