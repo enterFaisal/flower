@@ -1,12 +1,12 @@
-import fs from "fs";
-import path from "path";
 import { randomUUID } from "crypto";
-import { backupUsersFile } from "../../lib/backupUsers";
+import { openDb } from "../../lib/db";
+import { backupDatabase } from "../../lib/backupDb";
 
 const generateUserId = () => {
   try {
     return randomUUID();
   } catch (error) {
+    // Fallback for environments without crypto.randomUUID
     return `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   }
 };
@@ -21,7 +21,9 @@ export default async function handler(req, res) {
 
     // Validate input
     if (!name || !phone || !employeeId) {
-      return res.status(400).json({ error: "Name, phone, and employee ID are required" });
+      return res
+        .status(400)
+        .json({ error: "Name, phone, and employee ID are required" });
     }
 
     const trimmedName = name.trim();
@@ -29,49 +31,39 @@ export default async function handler(req, res) {
     const trimmedEmployeeId = employeeId.trim();
 
     // Validate that name has exactly 3 parts
-    const nameParts = trimmedName.split(/\s+/).filter(part => part.length > 0);
+    const nameParts = trimmedName
+      .split(/\s+/)
+      .filter((part) => part.length > 0);
     if (nameParts.length !== 3) {
-      return res.status(400).json({ 
-        error: "Name must consist of exactly 3 parts (first name, middle name, last name)" 
+      return res.status(400).json({
+        error:
+          "Name must consist of exactly 3 parts (first name, middle name, last name)",
       });
     }
 
-    // Create data directory if it doesn't exist
-    const dataDir = path.join(process.cwd(), "data");
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-
-    // Path to users data file
-    const usersFile = path.join(dataDir, "users.json");
-
-    // Read existing users or create empty array
-    let users = [];
-    if (fs.existsSync(usersFile)) {
-      const fileContent = fs.readFileSync(usersFile, "utf8");
-      users = JSON.parse(fileContent);
-    }
-
+    const db = await openDb();
     const now = new Date().toISOString();
 
-    // Match only when the same participant registers again (same name & phone)
-    const existingUserIndex = users.findIndex(
-      (u) => u.phone === sanitizedPhone && u.name === trimmedName
+    // Check if user exists
+    let user = await db.get(
+      "SELECT * FROM users WHERE phone = ? AND name = ?",
+      [sanitizedPhone, trimmedName]
     );
 
-    let userData;
+    let message = "";
 
-    if (existingUserIndex >= 0) {
-      userData = {
-        ...users[existingUserIndex],
-        name: trimmedName,
-        phone: sanitizedPhone,
-        employeeId: trimmedEmployeeId,
-        updatedAt: now,
-      };
-      users[existingUserIndex] = userData;
+    if (user) {
+      // User exists, update their info
+      await db.run(
+        "UPDATE users SET employeeId = ?, updatedAt = ? WHERE id = ?",
+        [trimmedEmployeeId, now, user.id]
+      );
+      user.employeeId = trimmedEmployeeId;
+      user.updatedAt = now;
+      message = "User updated";
     } else {
-      userData = {
+      // User does not exist, create new one
+      user = {
         id: generateUserId(),
         name: trimmedName,
         phone: sanitizedPhone,
@@ -79,25 +71,38 @@ export default async function handler(req, res) {
         registeredAt: now,
         updatedAt: now,
       };
-      users.push(userData);
+      await db.run(
+        "INSERT INTO users (id, name, phone, employeeId, registeredAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          user.id,
+          user.name,
+          user.phone,
+          user.employeeId,
+          user.registeredAt,
+          user.updatedAt,
+        ]
+      );
+      message = "User registered successfully";
     }
 
-    // Save to file
-    fs.writeFileSync(usersFile, JSON.stringify(users, null, 2), "utf8");
+    await backupDatabase();
 
-    // Create backup
-    backupUsersFile(usersFile);
+    // The backup logic for json is no longer needed.
+    // Database backup should be handled at the file level (e.g., copying database.sqlite)
 
     return res.status(200).json({
       success: true,
-      user: userData,
-      message:
-        existingUserIndex >= 0
-          ? "User updated"
-          : "User registered successfully",
+      user: user,
+      message: message,
     });
   } catch (error) {
     console.error("Registration error:", error);
+    // Check for unique constraint error
+    if (error.code === "SQLITE_CONSTRAINT") {
+      return res
+        .status(409)
+        .json({ error: "A user with this phone number already exists." });
+    }
     return res.status(500).json({ error: "Internal server error" });
   }
 }

@@ -423,17 +423,10 @@ export default function CommitmentQuiz() {
     }
   }, [router]);
 
-  const persistLevel = async (
-    level,
-    commitmentPercentageValue,
-    retryCount = 0
-  ) => {
+  const persistLevel = async (level, commitmentPercentageValue) => {
     const MAX_RETRIES = 3;
-    const RETRY_DELAY = 1000; // 1 second
-    const SOCKET_TIMEOUT = 5000; // 5 seconds
+    const RETRY_DELAY = 2000; // 2 seconds
 
-    // Get user data directly from localStorage as fallback
-    // This ensures we have the data even if state hasn't updated
     let userId = userIdentifiers.id;
     let phone = userIdentifiers.phone;
 
@@ -452,6 +445,22 @@ export default function CommitmentQuiz() {
 
     if (!userId && !phone) {
       console.warn("Cannot persist level: no user ID or phone found");
+      // Save to local storage for a later retry
+      try {
+        const backupData = {
+          level,
+          commitmentPercentage: commitmentPercentageValue,
+          userId: "",
+          phone: "",
+          timestamp: new Date().toISOString(),
+        };
+        localStorage.setItem("pendingLevelUpdate", JSON.stringify(backupData));
+        console.log(
+          "[Persist Level] Stored backup in localStorage for later retry (no user identifiers)"
+        );
+      } catch (e) {
+        console.error("[Persist Level] Failed to store backup:", e);
+      }
       return false;
     }
 
@@ -464,150 +473,76 @@ export default function CommitmentQuiz() {
         : {}),
     };
 
-    console.log(
-      `[Persist Level] Attempt ${retryCount + 1}/${
-        MAX_RETRIES + 1
-      }: Persisting level ${level} for user:`,
-      { userId, phone }
-    );
-
-    // Try WebSocket first, fallback to HTTP API
-    if (socket && socket.connected) {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        console.log("[Persist Level] Using WebSocket to update level");
+        console.log(
+          `[Persist Level] Attempt ${attempt}/${MAX_RETRIES}: Persisting level ${level} for user:`,
+          { userId, phone }
+        );
 
-        const result = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error("Socket timeout"));
-          }, SOCKET_TIMEOUT);
-
-          const successHandler = (data) => {
-            clearTimeout(timeout);
-            socket.off("level:update:success", successHandler);
-            socket.off("level:update:error", errorHandler);
-            resolve(data);
-          };
-
-          const errorHandler = (error) => {
-            clearTimeout(timeout);
-            socket.off("level:update:success", successHandler);
-            socket.off("level:update:error", errorHandler);
-            reject(new Error(error.error || "Socket update failed"));
-          };
-
-          socket.once("level:update:success", successHandler);
-          socket.once("level:update:error", errorHandler);
-          socket.emit("level:update", payload);
+        const response = await fetch("/api/users/update-progress", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         });
 
-        // Verify that the level was actually updated
-        if (result.success && result.finalLevel !== undefined) {
-          if (result.finalLevel >= level) {
-            console.log(
-              `[Persist Level] WebSocket Success! Level persisted: ${result.finalLevel} (requested: ${level})`
-            );
-            return true;
-          } else {
-            console.warn(
-              `[Persist Level] Level mismatch: got ${result.finalLevel}, expected ${level}. Retrying...`
-            );
-            throw new Error("Level mismatch in response");
-          }
-        } else {
-          throw new Error("Invalid response format");
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            `API returned ${response.status}: ${
+              errorData.error || "Unknown error"
+            }`
+          );
         }
-      } catch (socketError) {
-        console.warn(
-          `[Persist Level] WebSocket failed: ${socketError.message}, falling back to HTTP API`
-        );
-        // Fall through to HTTP API fallback
-      }
-    }
 
-    // Fallback to HTTP API if WebSocket is not available or failed
-    try {
-      console.log("[Persist Level] Using HTTP API to update level");
+        const result = await response.json();
 
-      const response = await fetch("/api/users/update-progress", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          `API returned ${response.status}: ${
-            errorData.error || "Unknown error"
-          }`
-        );
-      }
-
-      const result = await response.json();
-
-      // Verify that the level was actually updated
-      if (result.success && result.finalLevel !== undefined) {
-        if (result.finalLevel >= level) {
+        if (result.success && result.finalLevel >= level) {
           console.log(
             `[Persist Level] HTTP API Success! Level persisted: ${result.finalLevel} (requested: ${level})`
           );
+          // If there was a pending update, clear it
+          localStorage.removeItem("pendingLevelUpdate");
           return true;
         } else {
-          console.warn(
-            `[Persist Level] Level mismatch: got ${result.finalLevel}, expected ${level}. Retrying...`
+          throw new Error(
+            `Level mismatch or unsuccessful response: got ${result.finalLevel}, expected at least ${level}`
           );
-          throw new Error("Level mismatch in response");
         }
-      } else {
-        console.warn(
-          "[Persist Level] Response missing verification data. Retrying..."
-        );
-        throw new Error("Invalid response format");
-      }
-    } catch (error) {
-      console.error(
-        `[Persist Level] Attempt ${retryCount + 1} failed:`,
-        error.message
-      );
-
-      // Retry if we haven't exceeded max retries
-      if (retryCount < MAX_RETRIES) {
-        console.log(
-          `[Persist Level] Retrying in ${RETRY_DELAY}ms... (${
-            retryCount + 1
-          }/${MAX_RETRIES})`
-        );
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-        return persistLevel(level, commitmentPercentageValue, retryCount + 1);
-      } else {
+      } catch (error) {
         console.error(
-          "[Persist Level] All retry attempts failed. Level may not be persisted.",
-          error
+          `[Persist Level] Attempt ${attempt} failed:`,
+          error.message
         );
-        // Store in localStorage as backup so we can retry later
-        try {
-          const backupData = {
-            level,
-            commitmentPercentage: commitmentPercentageValue,
-            userId,
-            phone,
-            timestamp: new Date().toISOString(),
-          };
-          localStorage.setItem(
-            "pendingLevelUpdate",
-            JSON.stringify(backupData)
+        if (attempt === MAX_RETRIES) {
+          console.error(
+            "[Persist Level] All retry attempts failed. Level may not be persisted."
           );
-          console.log(
-            "[Persist Level] Stored backup in localStorage for later retry"
-          );
-        } catch (e) {
-          console.error("[Persist Level] Failed to store backup:", e);
+          // Store in localStorage as backup so we can retry later
+          try {
+            const backupData = {
+              ...payload,
+              timestamp: new Date().toISOString(),
+            };
+            localStorage.setItem(
+              "pendingLevelUpdate",
+              JSON.stringify(backupData)
+            );
+            console.log(
+              "[Persist Level] Stored backup in localStorage for later retry"
+            );
+          } catch (e) {
+            console.error("[Persist Level] Failed to store backup:", e);
+          }
+          return false;
         }
-        return false;
+        // Wait before the next retry
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
       }
     }
+    return false;
   };
 
   const currentQuestion = commitmentQuizData.questions[currentQuestionIndex];

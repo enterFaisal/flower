@@ -1,24 +1,30 @@
-import fs from "fs";
-import path from "path";
+import { openDb } from "../../lib/db";
 
-const usersFilePath = path.join(process.cwd(), "data", "users.json");
-
-function getUsers() {
-  try {
-    if (fs.existsSync(usersFilePath)) {
-      const data = fs.readFileSync(usersFilePath, "utf-8");
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error("Error reading users file:", error);
-  }
-  return [];
-}
-
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === "GET") {
-    const users = getUsers();
-    res.status(200).json(users);
+    try {
+      const db = await openDb();
+      const users = await db.all("SELECT * FROM users");
+
+      // Reconstruct the nested flower object for each user
+      const formattedUsers = users.map((user) => {
+        const { flower_seedName, flower_flowerImage, flower_level, ...rest } =
+          user;
+        return {
+          ...rest,
+          flower: {
+            seedName: flower_seedName,
+            flowerImage: flower_flowerImage,
+            level: flower_level,
+          },
+        };
+      });
+
+      res.status(200).json(formattedUsers);
+    } catch (error) {
+      console.error("Error fetching live data:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   } else {
     res.setHeader("Allow", ["GET"]);
     res.status(405).end(`Method ${req.method} Not Allowed`);

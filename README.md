@@ -20,9 +20,16 @@ pm2 startup
 ## Restart After Update
 
 ```bash
-# Rebuild and restart
+# Pull the latest changes
 git pull
+
+# Install any new dependencies
+npm install
+
+# Rebuild the application
 npm run build
+
+# Reload the app with PM2
 pm2 reload mewa-gamification
 ```
 
@@ -94,6 +101,5 @@ Backups are created at:
 
 ```
 project/
-  users-2024-01-15T10-30-45.json  (timestamped backup)
   users.json.backup                (latest backup, always overwritten)
 ```
