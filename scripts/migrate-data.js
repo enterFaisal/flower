@@ -48,7 +48,9 @@ async function migrate() {
     console.log(`Renamed ${usersFilePath} to ${usersFilePath}.migrated`);
   } catch (error) {
     if (error.code === "ENOENT") {
-      console.log("users.json not found, skipping migration. This is normal if migration has already run.");
+      console.log(
+        "users.json not found, skipping migration. This is normal if migration has already run."
+      );
     } else {
       await db.run("ROLLBACK;");
       console.error("Failed to migrate data:", error);

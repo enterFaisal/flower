@@ -8,7 +8,9 @@ export default async function handler(req, res) {
 
   try {
     const db = await openDb();
-    const users = await db.all("SELECT * FROM users ORDER BY registeredAt DESC");
+    const users = await db.all(
+      "SELECT * FROM users ORDER BY registeredAt DESC"
+    );
 
     // Reconstruct the nested flower object for each user
     const formattedUsers = users.map((user) => {
@@ -36,4 +38,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Internal server error" });
   }
 }
-
