@@ -397,7 +397,7 @@ export default function LiveDisplay() {
           
           </div>
         </main>
-          <div className="absolute bottom-4 right-4 bg-white rounded-2xl shadow-2xl p-6 w-80 z-10">
+          <div className="absolute bottom-4 right-4 bg-white rounded-2xl shadow-2xl p-6 w-50 z-10">
               <h3 className="text-xl font-bold text-mewa-green-700 mb-3 text-center">
                 ابدأ التسجيل
               </h3>
