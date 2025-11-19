@@ -394,7 +394,10 @@ export default function LiveDisplay() {
             )}
 
             {/* The QR Code is now absolutely positioned at the bottom-left */}
-            <div className="absolute bottom-4 right-4 bg-white rounded-2xl shadow-2xl p-6 w-80 z-10">
+          
+          </div>
+        </main>
+          <div className="absolute bottom-4 right-4 bg-white rounded-2xl shadow-2xl p-6 w-80 z-10">
               <h3 className="text-xl font-bold text-mewa-green-700 mb-3 text-center">
                 ابدأ التسجيل
               </h3>
@@ -413,8 +416,6 @@ export default function LiveDisplay() {
                 امسح الرمز للمشاركة
               </p>
             </div>
-          </div>
-        </main>
       </div>
 
       <style jsx>{`

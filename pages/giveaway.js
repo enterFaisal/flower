@@ -9,6 +9,7 @@ export default function Giveaway() {
   const [winner, setWinner] = useState(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false); // ✅ ADD THIS LINE
   const usersListRef = useRef(null);
   const winnerDisplayRef = useRef(null);
 
@@ -42,16 +43,17 @@ export default function Giveaway() {
 
     setIsSelecting(true);
     setWinner(null);
+    setShowModal(true); // ✅ ADD THIS LINE
 
-    // Scroll to users list with smooth behavior
-    setTimeout(() => {
-      if (usersListRef.current) {
-        usersListRef.current.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }
-    }, 100);
+    // ❌ REMOVE these scroll lines:
+    // setTimeout(() => {
+    //   if (usersListRef.current) {
+    //     usersListRef.current.scrollIntoView({
+    //       behavior: "smooth",
+    //       block: "start",
+    //     });
+    //   }
+    // }, 100);
 
     // Animate selection with multiple random picks
     let iterations = 0;
@@ -68,17 +70,23 @@ export default function Giveaway() {
         setWinner(eligibleUsers[finalIndex]);
         setIsSelecting(false);
 
-        // Scroll to winner display section after selection completes
-        setTimeout(() => {
-          if (winnerDisplayRef.current) {
-            winnerDisplayRef.current.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-            });
-          }
-        }, 300);
+        // ❌ REMOVE these scroll lines:
+        // setTimeout(() => {
+        //   if (winnerDisplayRef.current) {
+        //     winnerDisplayRef.current.scrollIntoView({
+        //       behavior: "smooth",
+        //       block: "center",
+        //     });
+        //   }
+        // }, 300);
       }
     }, 100);
+  };
+
+  // ✅ ADD THIS FUNCTION
+  const closeModal = () => {
+    setShowModal(false);
+    setWinner(null);
   };
 
   return (
@@ -177,7 +185,7 @@ export default function Giveaway() {
           )}
 
           {/* Winner Display */}
-          {winner && !isSelecting && (
+          {/* {winner && !isSelecting && (
             <div
               ref={winnerDisplayRef}
               className="max-w-2xl mx-auto mb-6 sm:mb-8 md:mb-12 animate-pop-in"
@@ -226,10 +234,10 @@ export default function Giveaway() {
                 </div>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Eligible Users List */}
-          {!isLoading && eligibleUsers.length > 0 && (
+          {/* {!isLoading && eligibleUsers.length > 0 && (
             <div ref={usersListRef} className="max-w-6xl mx-auto">
               <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 md:p-8">
                 <h3 className="text-xl sm:text-2xl font-bold text-mewa-green-700 mb-4 sm:mb-6 text-center">
@@ -284,7 +292,7 @@ export default function Giveaway() {
                 </div>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Empty State */}
           {!isLoading && eligibleUsers.length === 0 && (
@@ -310,6 +318,83 @@ export default function Giveaway() {
             </div>
           )}
         </main>
+
+        {/* ✅ ADD THIS ENTIRE MODAL SECTION AT THE END, BEFORE </div> */}
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black bg-opacity-70"
+              onClick={!isSelecting ? closeModal : undefined}
+            ></div>
+            <div className="relative z-10 w-full max-w-2xl">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-10">
+                {!isSelecting && winner && (
+                  <button
+                    onClick={closeModal}
+                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl"
+                  >
+                    ✕
+                  </button>
+                )}
+                {isSelecting && (
+                  <div className="text-center py-8">
+                    {/* <div className="text-7xl mb-6 animate-spin">🌹</div> */}
+                    <h3 className="text-3xl font-bold text-mewa-green-700 mb-4">
+                      جاري السحب...
+                    </h3>
+                    {winner && (
+                      <div className="bg-gray-100 rounded-xl p-6">
+                        <h4 className="text-2xl font-bold text-mewa-green-700">
+                          {winner.name}
+                        </h4>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!isSelecting && winner && (
+                  <div ref={winnerDisplayRef} className="text-center">
+                    <div className="text-8xl mb-4">🎉</div>
+                    <h3 className="text-4xl font-bold text-mewa-green-700 mb-6">
+                      مبروك! الفائز بالجائزة
+                    </h3>
+                    <div className="bg-gray-50 rounded-xl p-8 mb-6">
+                      {/* {winner.flower && (
+                        <div className="relative w-40 h-40 mx-auto mb-4">
+                          <Image
+                            src={winner.flower.flowerImage}
+                            alt={winner.flower.seedName}
+                            fill
+                            sizes="160px"
+                            style={{ objectFit: "contain" }}
+                          />
+                        </div>
+                      )} */}
+                      <h4 className="text-3xl font-bold text-mewa-green-700 mb-2">
+                        {winner.name}
+                      </h4>
+                      {winner.employeeId && (
+                        <p className="text-lg text-gray-600 mb-1">
+                          رقم الموظف: {winner.employeeId}
+                        </p>
+                      )}
+                      {winner.phone && (
+                        <p className="text-base text-gray-500">
+                          {winner.phone}
+                        </p>
+                      )}
+                      {winner.flower && (
+                        <p className="text-lg text-mewa-accent-600 font-semibold mt-2">
+                          {winner.flower.seedName}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-5xl">🎁</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
