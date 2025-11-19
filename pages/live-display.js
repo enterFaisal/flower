@@ -401,7 +401,7 @@ export default function LiveDisplay() {
               <h3 className="text-xl font-bold text-mewa-green-700 mb-3 text-center">
                 ابدأ التسجيل
               </h3>
-              <div className="bg-white p-3 rounded-lg border-4 border-mewa-accent-500 mb-3 w-64 h-64 flex items-center justify-center mx-auto">
+              <div className="bg-white p-3 rounded-lg border-4 border-mewa-accent-500 mb-3 w-44 h-44 flex items-center justify-center mx-auto">
                 {registrationUrl && (
                   <QRCodeSVG
                     value={registrationUrl}
